@@ -1,39 +1,45 @@
+//CMYK Представлен как в классической модели на панели сбоку, так и в модели CMYK 255
+
 import javax.swing.*;
+import javax.swing.colorchooser.AbstractColorChooserPanel;
+import javax.swing.event.ChangeListener;
+
 import java.awt.*;
 import java.awt.event.*;
 
 public class ColorPicker extends JFrame {
     private JColorChooser colorChooser;
-    private JTextField rgbField, cmykField, hsvField;
+    private JTextField rgbField, hsvField;
+    private CMYKPanel cmykPanel;
 
     public ColorPicker() {
         setTitle("Color Picker");
         setSize(600, 400);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-
         colorChooser = new JColorChooser();
         removeHslTab(colorChooser);
+
         colorChooser.getSelectionModel().addChangeListener(e -> updateColorFields());
 
         rgbField = new JTextField();
-        cmykField = new JTextField();
         hsvField = new JTextField();
+        cmykPanel = new CMYKPanel();
 
-        JPanel fieldsPanel = new JPanel(new GridLayout(3, 1));
+        JPanel fieldsPanel = new JPanel(new GridLayout(2, 1));
         fieldsPanel.add(rgbField);
-        fieldsPanel.add(cmykField);
         fieldsPanel.add(hsvField);
 
         add(colorChooser, BorderLayout.CENTER);
         add(fieldsPanel, BorderLayout.SOUTH);
+        add(cmykPanel, BorderLayout.EAST);
     }
-   
-    private void removeHslTab(JColorChooser chooser) {
-        for (Component comp : chooser.getComponents()) {
 
+    private void removeHslTab(JColorChooser chooser) {
+        // Получаем основной компонент JColorChooser.
+        for (Component comp : chooser.getComponents()) {
             if (comp instanceof JTabbedPane) {
-                JTabbedPane tabbedPane = (JTabbedPane) comp;             
+                JTabbedPane tabbedPane = (JTabbedPane) comp;
                 for (int i = 0; i < tabbedPane.getTabCount(); i++) {
                     String title = tabbedPane.getTitleAt(i);
                     if (title.equalsIgnoreCase("HSL")) {
@@ -44,6 +50,7 @@ public class ColorPicker extends JFrame {
             }
         }
     }
+
     private void updateColorFields() {
         Color color = colorChooser.getColor();
         int r = color.getRed();
@@ -51,21 +58,10 @@ public class ColorPicker extends JFrame {
         int b = color.getBlue();
 
         rgbField.setText("RGB: " + r + ", " + g + ", " + b);
-        cmykField.setText("CMYK: " + rgbToCmyk(r, g, b));
         hsvField.setText("HSV: " + rgbToHsv(r, g, b));
-    }
 
-    private String rgbToCmyk(int r, int g, int b) {
-        float rf = r / 255f;
-        float gf = g / 255f;
-        float bf = b / 255f;
-
-        float k = 1 - Math.max(rf, Math.max(gf, bf));
-        float c = (1 - rf - k) / (1 - k);
-        float m = (1 - gf - k) / (1 - k);
-        float y = (1 - bf - k) / (1 - k);
-
-        return String.format("%.2f, %.2f, %.2f, %.2f", c * 100, m * 100, y * 100, k * 100);
+        // Обновляем CMYK-панель.
+        cmykPanel.setRGB(r, g, b);
     }
 
     private String rgbToHsv(int r, int g, int b) {
@@ -95,58 +91,84 @@ public class ColorPicker extends JFrame {
         return String.format("%.2f, %.2f, %.2f", h * 360, s * 100, v * 100);
     }
 
-    private int[] cmykToRgb(float c, float m, float y, float k) {
-        c /= 100;
-        m /= 100;
-        y /= 100;
-        k /= 100;
+    private class CMYKPanel extends JPanel {
+        private JSpinner cSpinner, mSpinner, ySpinner, kSpinner;
 
-        int r = Math.round(255 * (1 - c) * (1 - k));
-        int g = Math.round(255 * (1 - m) * (1 - k));
-        int b = Math.round(255 * (1 - y) * (1 - k));
-        return new int[]{r, g, b};
-    }
+        public CMYKPanel() {
+            setLayout(new GridLayout(5, 1));
+            setBorder(BorderFactory.createTitledBorder("CMYK"));
 
-    private String cmykToHsv(float c, float m, float y, float k) {
-        int[] rgb = cmykToRgb(c, m, y, k);
-        return rgbToHsv(rgb[0], rgb[1], rgb[2]);
-    }
+            cSpinner = createSpinner();
+            mSpinner = createSpinner();
+            ySpinner = createSpinner();
+            kSpinner = createSpinner();
 
-    private float[] hsvToRgb(float h, float s, float v) {
-        float c = v * s;
-        float x = c * (1 - Math.abs((h / 60) % 2 - 1));
-        float m = v - c;
-
-        float rf = 0, gf = 0, bf = 0;
-        if (0 <= h && h < 60) {
-            rf = c;
-            gf = x;
-        } else if (60 <= h && h < 120) {
-            rf = x;
-            gf = c;
-        } else if (120 <= h && h < 180) {
-            gf = c;
-            bf = x;
-        } else if (180 <= h && h < 240) {
-            gf = x;
-            bf = c;
-        } else if (240 <= h && h < 300) {
-            rf = x;
-            bf = c;
-        } else if (300 <= h && h < 360) {
-            rf = c;
-            bf = x;
+            add(new JLabel("C:"));
+            add(cSpinner);
+            add(new JLabel("M:"));
+            add(mSpinner);
+            add(new JLabel("Y:"));
+            add(ySpinner);
+            add(new JLabel("K:"));
+            add(kSpinner);
+            ChangeListener changeListener = e -> updateColorFromCmyk();
+            cSpinner.addChangeListener(changeListener);
+            mSpinner.addChangeListener(changeListener);
+            ySpinner.addChangeListener(changeListener);
+            kSpinner.addChangeListener(changeListener);
         }
 
-        int r = Math.round((rf + m) * 255);
-        int g = Math.round((gf + m) * 255);
-        int b = Math.round((bf + m) * 255);
-        return new float[]{r, g, b};
-    }
+        private JSpinner createSpinner() {
+            SpinnerNumberModel model = new SpinnerNumberModel(0, 0, 100, 1);
+            JSpinner spinner = new JSpinner(model);
+            return spinner;
+        }
+        private void updateColorFromCmyk() {
+            int c = (int) cSpinner.getValue();
+            int m = (int) mSpinner.getValue();
+            int y = (int) ySpinner.getValue();
+            int k = (int) kSpinner.getValue();
+            int[] rgb = cmykToRgb(c, m, y, k);
+            colorChooser.setColor(new Color(rgb[0], rgb[1], rgb[2]));
+        }
 
-    private String hsvToCmyk(float h, float s, float v) {
-        float[] rgb = hsvToRgb(h, s, v);
-        return rgbToCmyk((int) rgb[0], (int) rgb[1], (int) rgb[2]);
+        public void setRGB(int r, int g, int b) {
+            String cmyk = rgbToCmyk(r, g, b);
+            String[] values = cmyk.split(", ");
+            cSpinner.setValue(Integer.parseInt(values[0]));
+            mSpinner.setValue(Integer.parseInt(values[1]));
+            ySpinner.setValue(Integer.parseInt(values[2]));
+            kSpinner.setValue(Integer.parseInt(values[3]));
+        }
+
+        private int[] cmykToRgb(int c, int m, int y, int k) {
+            float cValue = c / 100f;
+            float mValue = m / 100f;
+            float yValue = y / 100f;
+            float kValue = k / 100f;
+
+            int r = Math.round(255 * (1 - cValue) * (1 - kValue));
+            int g = Math.round(255 * (1 - mValue) * (1 - kValue));
+            int b = Math.round(255 * (1 - yValue) * (1 - kValue));
+            return new int[]{r, g, b};
+        }
+
+        private String rgbToCmyk(int r, int g, int b) {
+            float rf = r / 255f;
+            float gf = g / 255f;
+            float bf = b / 255f;
+
+            float k = 1 - Math.max(rf, Math.max(gf, bf));
+            float c = (1 - rf - k) / (1 - k);
+            float m = (1 - gf - k) / (1 - k);
+            float y = (1 - bf - k) / (1 - k);
+
+            return String.format("%d, %d, %d, %d",
+                    Math.round(c * 100),
+                    Math.round(m * 100),
+                    Math.round(y * 100),
+                    Math.round(k * 100));
+        }
     }
 
     public static void main(String[] args) {
