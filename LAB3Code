@@ -1,0 +1,353 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.List;
+
+public class RasterAlgorithms extends JFrame {
+    private final DrawingPanel drawingPanel;
+    private final JTextField startXField, startYField, endXField, endYField, radiusField;
+    private final JComboBox<String> algorithmSelect;
+    private final JLabel endXLabel, endYLabel, radiusLabel;
+    private final JLabel timeLabel;
+
+    public RasterAlgorithms() {
+        setTitle("Raster Algorithms");
+        setSize(800, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        drawingPanel = new DrawingPanel();
+        startXField = new JTextField(5);
+        startYField = new JTextField(5);
+        endXField = new JTextField(5);
+        endYField = new JTextField(5);
+        radiusField = new JTextField(5);
+
+        algorithmSelect = new JComboBox<>(new String[]{"Step-by-Step", "DDA", "Bresenham Line", "Bresenham Circle"});
+        algorithmSelect.addActionListener(new AlgorithmSelectAction());
+
+        JButton drawButton = new JButton("Draw");
+        drawButton.addActionListener(new DrawAction());
+
+        JPanel controlPanel = new JPanel();
+        controlPanel.add(new JLabel("Start X:"));
+        controlPanel.add(startXField);
+        controlPanel.add(new JLabel("Start Y:"));
+        controlPanel.add(startYField);
+
+        endXLabel = new JLabel("End X:");
+        endYLabel = new JLabel("End Y:");
+        radiusLabel = new JLabel("Radius:");
+        radiusLabel.setVisible(false);
+
+        controlPanel.add(endXLabel);
+        controlPanel.add(endXField);
+        controlPanel.add(endYLabel);
+        controlPanel.add(endYField);
+
+        controlPanel.add(radiusLabel);
+        controlPanel.add(radiusField);
+        radiusField.setVisible(false);
+
+        controlPanel.add(new JLabel("Algorithm:"));
+        controlPanel.add(algorithmSelect);
+
+        controlPanel.add(drawButton);
+        
+        timeLabel = new JLabel("Time: 0 ms");
+        controlPanel.add(timeLabel);
+
+        add(controlPanel, BorderLayout.NORTH);
+        add(drawingPanel, BorderLayout.CENTER);
+    }
+
+    private class AlgorithmSelectAction implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            String algorithm = (String) algorithmSelect.getSelectedItem();
+            if ("Bresenham Circle".equals(algorithm)) {
+                endXLabel.setVisible(false);
+                endYLabel.setVisible(false);
+                endXField.setVisible(false);
+                endYField.setVisible(false);
+
+                radiusLabel.setVisible(true);
+                radiusField.setVisible(true);
+            } else {
+                endXLabel.setVisible(true);
+                endYLabel.setVisible(true);
+                endXField.setVisible(true);
+                endYField.setVisible(true);
+
+                radiusLabel.setVisible(false);
+                radiusField.setVisible(false);
+            }
+        }
+    }
+
+    private class DrawAction implements ActionListener {
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            int x0 = Integer.parseInt(startXField.getText());
+            int y0 = Integer.parseInt(startYField.getText());
+
+            String algorithm = (String) algorithmSelect.getSelectedItem();
+            drawingPanel.clearPixels();
+
+            long startTime = System.nanoTime();
+
+            if ("Bresenham Circle".equals(algorithm)) {
+                int radius = Integer.parseInt(radiusField.getText());
+                drawingPanel.drawBresenhamCircle(x0, y0, radius);
+            } else {
+                int x1 = Integer.parseInt(endXField.getText());
+                int y1 = Integer.parseInt(endYField.getText());
+
+                switch (algorithm) {
+                    case "Step-by-Step":
+                        drawingPanel.drawStepByStep(x0, y0, x1, y1);
+                        break;
+                    case "DDA":
+                        drawingPanel.drawDDA(x0, y0, x1, y1);
+                        break;
+                    case "Bresenham Line":
+                        drawingPanel.drawBresenhamLine(x0, y0, x1, y1);
+                        break;
+                }
+            }
+
+            long endTime = System.nanoTime();
+            double elapsedTimeMs = (endTime - startTime) / 1_000_000.0;
+            timeLabel.setText(String.format("Time: %.3f ms", elapsedTimeMs));
+
+            drawingPanel.repaint();
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            RasterAlgorithms app = new RasterAlgorithms();
+            app.setVisible(true);
+        });
+    }
+}
+
+class DrawingPanel extends JPanel {
+    private final int pixelSize = 10;
+    private final List<Point> pixels = new ArrayList<>();
+
+    public DrawingPanel() {
+        setPreferredSize(new Dimension(600, 600));
+        setBackground(Color.WHITE);
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        drawGrid(g);     
+        drawAxes(g);     
+        drawPixels(g);  
+    }
+
+    private void drawGrid(Graphics g) {
+        g.setColor(Color.LIGHT_GRAY);
+        for (int x = 0; x < getWidth(); x += pixelSize) {
+            g.drawLine(x, 0, x, getHeight());
+        }
+        for (int y = 0; y < getHeight(); y += pixelSize) {
+            g.drawLine(0, y, getWidth(), y);
+        }
+    }
+    private void drawAxes(Graphics g) {
+        int centerX = getWidth() / 2;
+        int centerY = getHeight() / 2;
+        g.setColor(Color.BLACK);
+        g.drawLine(centerX - 1, 0, centerX - 1, getHeight());
+        g.drawLine(0, centerY - 1, getWidth(), centerY - 1);
+        int labelStep = 50; 
+        int tickStep = 10;  
+        int tickLength = 3; 
+
+        for (int x = centerX; x < getWidth(); x += labelStep) {
+            int coord = (x - centerX) / pixelSize;
+            if (coord != 0) {
+                g.drawString(String.valueOf(coord), x, centerY + 15);
+                g.drawString(String.valueOf(-coord), 2 * centerX - x-10, centerY + 15);
+            }
+        }
+        for (int x = centerX; x < getWidth(); x += tickStep) {
+            g.drawLine(x-1, centerY - tickLength-1, x-1, centerY + tickLength-1);
+            g.drawLine(2 * centerX - x-1, centerY - tickLength-1, 2 * centerX - x-1, centerY + tickLength-1);
+        }
+
+        for (int y = centerY; y < getHeight(); y += labelStep) {
+            int coord = (centerY - y) / pixelSize;
+            if (coord != 0) {
+            	
+                g.drawString(String.valueOf(coord), centerX + 5, y);
+                g.drawString(String.valueOf(-coord), centerX + 5, 2 * centerY - y);
+            }
+        }
+        for (int y = centerY; y < getHeight(); y += tickStep) {
+            g.drawLine(centerX - tickLength-1, y-1, centerX + tickLength-1, y-1);
+            g.drawLine(centerX - tickLength-1, 2 * centerY - y-1, centerX + tickLength-1, 2 * centerY - y-1);
+        }
+    }
+
+    private void drawPixels(Graphics g) {
+        g.setColor(Color.RED);
+        for (Point p : pixels) {
+            int pixelX = getWidth() / 2 + p.x * pixelSize;    
+            int pixelY = getHeight() / 2 - p.y * pixelSize; 
+            g.fillRect(pixelX-1, pixelY-11, pixelSize, pixelSize);
+        }
+    }
+
+    public void drawPixel(int x, int y) {
+        pixels.add(new Point(x, y));  
+    }
+
+    public void clearPixels() {
+        pixels.clear();
+    }
+    public static int roundDown(double number) {
+        return (int) Math.floor(number);
+    }
+    
+    // Пошаговый Алгоритм
+    public void drawStepByStep(int x0, int y0, int x1, int y1) {
+        int dx = x1 - x0;
+        int dy = y1 - y0;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+            stepByStepLineXBased(x0, y0, x1, y1);
+        } else {
+            stepByStepLineYBased(x0, y0, x1, y1);
+        }
+    }
+
+    private void stepByStepLineXBased(int x0, int y0, int x1, int y1) {
+        int dx = x1 - x0;
+        int dy = y1 - y0;
+        
+        if (dx == 0) {
+            for (int y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) {
+                drawPixel(x0, y);
+            }
+            return;
+        }
+
+        double K = (double) dy / dx;
+        double b = y0 - K * x0;
+        int stepX = x1 > x0 ? 1 : -1;
+
+        int x = x0;
+        while ((stepX > 0 && x <= x1) || (stepX < 0 && x >= x1)) {
+            int y = (int) roundDown(K * x + b);
+            drawPixel(x, y);
+            x += stepX;
+        }
+    }
+
+    private void stepByStepLineYBased(int x0, int y0, int x1, int y1) {
+        int dx = x1 - x0;
+        int dy = y1 - y0;
+        
+        if (dy == 0) {
+            for (int x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) {
+                drawPixel(x, y0);
+            }
+            return;
+        }
+
+        double K = (double) dx / dy;
+        double b = x0 - K * y0;
+        int stepY = y1 > y0 ? 1 : -1;
+
+        int y = y0;
+        while ((stepY > 0 && y <= y1) || (stepY < 0 && y >= y1)) {
+            int x = (int) roundDown(K * y + b);
+            drawPixel(x, y);
+            y += stepY;
+        }
+    }
+
+    // Алгоритм ЦДА
+    public void drawDDA(int x0, int y0, int x1, int y1) {
+        float dx = x1 - x0;
+        float dy = y1 - y0;
+        int steps = (int)Math.max(Math.abs(dx), Math.abs(dy));
+
+        float xIncrement = dx / (float) steps;
+        float yIncrement = dy / (float) steps;
+
+        float x = x0;
+        float y = y0;
+        for (int i = 0; i <= steps; i++) {
+            drawPixel(roundDown(x), roundDown(y));
+            x += xIncrement;
+            y += yIncrement;
+        }
+    }
+
+    // Алгоритм Брезенхема для линий
+    public void drawBresenhamLine(int x0, int y0, int x1, int y1) {
+        double dx = Math.abs(x1 - x0);
+        double dy = Math.abs(y1 - y0);
+
+        double sx = x0 < x1 ? 1 : -1;
+        double sy = y0 < y1 ? 1 : -1;
+
+        double err = dx - dy;
+
+        while (true) {
+            drawPixel(roundDown(x0), roundDown(y0));
+            if (x0 == x1 && y0 == y1) break;
+
+            double e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x0 += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y0 += sy;
+            }
+        }
+    }
+
+    // Алгоритм Брезенхема для окружности
+    public void drawBresenhamCircle(int xc, int yc, int r) {
+        int x = 0;
+        int y = r;
+        int d = 3 - 2 * r;
+
+        drawCirclePixels(xc, yc, x, y);
+
+        while (y >= x) {
+            x++;
+
+            if (d > 0) {
+                y--;
+                d = d + 4 * (x - y) + 10;
+            } else {
+                d = d + 4 * x + 6;
+            }
+
+            drawCirclePixels(xc, yc, x, y);
+        }
+    }
+
+    private void drawCirclePixels(int xc, int yc, int x, int y) {
+        drawPixel(xc + x, yc + y);
+        drawPixel(xc - x, yc + y);
+        drawPixel(xc + x, yc - y);
+        drawPixel(xc - x, yc - y);
+        drawPixel(xc + y, yc + x);
+        drawPixel(xc - y, yc + x);
+        drawPixel(xc + y, yc - x);
+        drawPixel(xc - y, yc - x);
+    }
+}
